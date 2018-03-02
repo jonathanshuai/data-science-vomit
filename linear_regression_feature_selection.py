@@ -49,7 +49,7 @@ print("lasso training mse: {}".format(mean_squared_error(train_pred, y_train)))
 print("lasso testing mse: {}".format(mean_squared_error(test_pred, y_test)))
 
 # See which features lasso regression selected
-print(lasso_model.coef_)
+print(lasso_model.best_estimator_.coef_)
 
 
 
@@ -87,8 +87,8 @@ def forward_selection(X, y, columns=[], entry_sl=0.05):
 def bidirectional_elimination(X, y, columns=[], entry_sl=0.05, exit_sl=0.05):
   converged = False
   while not converged:
-    new_columns = forward_selection(X, y, columns)
-    new_columns = backwards_elimination(X, y, new_columns)
+    new_columns = forward_selection(X, y, columns, entry_sl)
+    new_columns = backwards_elimination(X, y, new_columns, exit_sl)
     if columns == new_columns:
       converged = True
     columns = new_columns
@@ -97,15 +97,41 @@ def bidirectional_elimination(X, y, columns=[], entry_sl=0.05, exit_sl=0.05):
 
 columns = bidirectional_elimination(X_train, y_train)
 
+# Adjusted R-squared:
+def adjusted_r_2(mse, var, n, p):
+  r_squared = 1 - (mse/var)
+  return 1 - ((1 - r_squared) * (n - 1) / (n - p - 1))
 
 
 clf = LinearRegression()
 clf.fit(X_train, y_train)
-clf.predict(X_train)
-clf.predict(X_test)
+print(clf.coef_)
+train_mse = mean_squared_error(clf.predict(X_train), y_train)
+test_mse = mean_squared_error(clf.predict(X_test), y_test)
+train_adj_r_2 = adjusted_r_2(train_mse, y_train.var(), len(y_train), len(clf.coef_))
+test_adj_r_2 = adjusted_r_2(train_mse, y_test.var(), len(y_test), len(clf.coef_))
+print("No feature selection train mse: {}".format(train_mse))
+print("No feature selection test mse: {}".format(test_mse))
+print("no feature selection train adjusted r^2: {}".format(train_adj_r_2))
+print("no feature selection test adjusted r^2: {}".format(test_adj_r_2))
 
-X_train = X_train[columns]
-X_test = X_test[columns]
 
+X_train = X_train[:,columns]
+X_test = X_test[:,columns]
+
+clf.fit(X_train, y_train)
+print(clf.coef_) # Note: this has very similar coefficients to lasso (same features were selected)
+
+
+train_mse = mean_squared_error(clf.predict(X_train), y_train)
+test_mse = mean_squared_error(clf.predict(X_test), y_test)
+train_adj_r_2 = adjusted_r_2(train_mse, y_train.var(), len(y_train), len(clf.coef_))
+test_adj_r_2 = adjusted_r_2(train_mse, y_test.var(), len(y_test), len(clf.coef_))
+print("feature selection train mse: {}".format(train_mse))
+print("feature selection test mse: {}".format(test_mse))
+print("feature selection train adjusted r^2: {}".format(train_adj_r_2))
+print("feature selection test adjusted r^2: {}".format(test_adj_r_2))
+
+ 
 
 
