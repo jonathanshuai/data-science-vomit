@@ -27,6 +27,8 @@ df = pd.read_csv(data_file)
 df =  pd.get_dummies(df)
 relevant_columns = ['R&D Spend', 'Administration', 'Marketing Spend', 'State_California']
 
+print(relevant_columns)
+
 X = df[relevant_columns].values
 y = df['Profit'].values
 
@@ -49,6 +51,8 @@ print("lasso training mse: {}".format(mean_squared_error(train_pred, y_train)))
 print("lasso testing mse: {}".format(mean_squared_error(test_pred, y_test)))
 
 # See which features lasso regression selected
+print("---Lasso coefficients---")
+print(relevant_columns)
 print(lasso_model.best_estimator_.coef_)
 
 
@@ -95,7 +99,6 @@ def bidirectional_elimination(X, y, columns=[], entry_sl=0.05, exit_sl=0.05):
 
   return new_columns
 
-columns = bidirectional_elimination(X_train, y_train)
 
 # Adjusted R-squared:
 def adjusted_r_2(mse, var, n, p):
@@ -105,6 +108,8 @@ def adjusted_r_2(mse, var, n, p):
 
 clf = LinearRegression()
 clf.fit(X_train, y_train)
+print("---LinearRegression coefficients---")
+print(relevant_columns)
 print(clf.coef_)
 train_mse = mean_squared_error(clf.predict(X_train), y_train)
 test_mse = mean_squared_error(clf.predict(X_test), y_test)
@@ -116,10 +121,15 @@ print("no feature selection train adjusted r^2: {}".format(train_adj_r_2))
 print("no feature selection test adjusted r^2: {}".format(test_adj_r_2))
 
 
+columns = bidirectional_elimination(X_train, y_train)
+print("Columns selected from bidirectional elimination: {}".format(columns))
+
 X_train = X_train[:,columns]
 X_test = X_test[:,columns]
 
 clf.fit(X_train, y_train)
+print("---coefficients from bidirectional_elimination---")
+print(np.array(relevant_columns)[columns]) # Select the names of the features that were selected
 print(clf.coef_) # Note: this has very similar coefficients to lasso (same features were selected)
 
 
