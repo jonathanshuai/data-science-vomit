@@ -34,26 +34,66 @@ train_df = pd.get_dummies(train_df)
 test_df = pd.get_dummies(test_df)
 
 # Perform transformations
-train_df['Balance_dummy'] = train_df['Balance'].apply(lambda x: 0 if x != 0 else 1)
-train_df['Balance_ln'] = train_df['Balance'].apply(lambda x: np.log(x) if x != 0 else 0)
-train_df['WealthAccumulation'] = train_df[['Balance', 'Age']].apply(lambda x: x[0]/x[1], axis=1)
 
+# Dummy variable if balance is 0
+train_df['Balance_dummy'] = train_df['Balance'].apply(lambda x: 0 if x != 0 else 1)
 test_df['Balance_dummy'] = test_df['Balance'].apply(lambda x: 0 if x != 0 else 1)
+
+# ln(balance)
+train_df['Balance_ln'] = train_df['Balance'].apply(lambda x: np.log(x) if x != 0 else 0)
 test_df['Balance_ln'] = test_df['Balance'].apply(lambda x: np.log(x) if x != 0 else 0)
-test_df['WealthAccumulation'] = test_df[['Balance', 'Age']].apply(lambda x: x[0]/x[1], axis=1)
+
+# balance / age (think of wealth accumulation speed)
+train_df['WealthAccumulation'] = train_df[['Balance', 'Age']].apply(lambda x: x[0] / x[1], axis=1)
+test_df['WealthAccumulation'] = test_df[['Balance', 'Age']].apply(lambda x: x[0] / x[1], axis=1)
+
+# ln(WealthAccumulation)
+train_df['Log_WA'] = train_df['WealthAccumulation'].apply(lambda x: np.log(x) if x != 0 else 0)
+test_df['Log_WA'] = test_df['WealthAccumulation'].apply(lambda x: np.log(x) if x != 0 else 0)
 
 
 # Get the label and predictor columns
 label_column = 'Exited'
 predictor_columns = [
-  'CreditScore', 'Age', 'Tenure', 'NumOfProducts', 
-  'HasCrCard', 'IsActiveMember', 'EstimatedSalary',
-  'Gender_Female', 'Geography_Germany', 'Geography_Spain',
-  'Balance_dummy', 'Balance_ln', 'WealthAccumulation']
+  'CreditScore', 
+  'Age',
+  'Tenure',
+  'NumOfProducts',
+  'HasCrCard',
+  'IsActiveMember',
+  'EstimatedSalary',
+  'Gender_Female',
+  'Geography_Germany',
+  'Geography_Spain',
+  'Balance_dummy',
+  'Balance_ln',
+  # 'Balance',
+  'WealthAccumulation'
+  # 'Log_WA'
+  ]
 
 # Get the relevant data
 X_train, y_train = train_df[predictor_columns], train_df[label_column]
 X_test, y_test = test_df[predictor_columns], test_df[label_column]
+
+# Get variance inflation factors (measure of multi?collinearity)
+def get_vif(X):
+  vif_df = pd.DataFrame()
+  vif_df['feature'] = X.columns
+  vif_df['vif_value'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+  return vif_df
+
+vif_df = get_vif(X_train)
+print("=== variance inflation factors ===")
+print(vif_df)
+
+# Look at correlation 
+correlation_columns = ['Balance_dummy', 'Balance_ln', 'WealthAccumulation', 'Age']
+temp_df = X_train[correlation_columns]
+correlation_df = pd.DataFrame(np.corrcoef(temp_df.values, rowvar=False))
+correlation_df.index = correlation_columns
+correlation_df.columns = correlation_columns
+
 
 # Simple to print model results
 def get_model_results(clf, X, y):
@@ -93,9 +133,38 @@ print(predictor_columns)
 print(clf.best_estimator_.coef_)
 print("====================================")
 
-
 # print("===== Results on testing set =====")
 # (test_preds, test_acc, test_recall,
 # test_precision, test_conf_matr) = get_model_results(clf, X_test, y_test)
 # print("====================================")
 
+# Plot a CAP (cumulative accuracy profile) curve
+# Note: the CAP can be interpreted as what percent of samples (on the x axis) 
+# should we look at to get some accuracy (on the y axis), similar to the stats
+# reported in Predictive Analytics. 
+# e.g. Customers in the top 50% of probability scores accounted for 80% of the exits
+# or something along those lines.
+# This kind of analysis relies on the predictions to be sorted by probability
+
+n_samples = len(y_train)
+total_positives = np.sum(y_train)
+train_probs = clf.predict_proba(X_train)
+sorted_train_probs = list(zip(train_probs[:,0], y_train)) # Note: train_probs[:,0] is the probability of NEGATIVE
+sorted_train_probs.sort() # This sorts by ASC so samples predicted more likely to be positive are first
+
+# Get the points to plot accuracy curve
+seen_positives = 0
+
+step = 1 / (n_samples)
+accuracy_curve_x = np.arange(step, 1 + step, step)
+accuracy_curve_y = []
+for i, (_, label) in enumerate(sorted_train_probs):
+  seen_positives += label
+  accuracy_curve_y.append(seen_positives / total_positives)
+
+
+fig, ax = plt.subplots()
+ax.plot([0, 1], [0, 1], color='r', linestyle='--')
+ax.plot(accuracy_curve_x, accuracy_curve_y, color='r')
+
+plt.show()
