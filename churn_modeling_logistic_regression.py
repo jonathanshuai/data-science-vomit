@@ -129,8 +129,12 @@ clf.fit(X_train, y_train)
 print("===== Results on training set =====")
 (train_preds, train_acc, train_recall,
 train_precision, train_conf_matr) = get_model_results(clf, X_train, y_train)
-print(predictor_columns)
-print(clf.best_estimator_.coef_)
+coef_df = pd.DataFrame()
+coef_df['feature'] = predictor_columns
+coef_df['coefficient'] = clf.best_estimator_.coef_[0]
+coef_df['odds_ratio'] = coef_df['coefficient'].apply(lambda x: np.exp(x))
+coef_df.sort_values('odds_ratio', ascending=False)
+print(coef_df)
 print("====================================")
 
 # print("===== Results on testing set =====")
@@ -155,8 +159,7 @@ sorted_train_probs.sort() # This sorts by ASC so samples predicted more likely t
 # Get the points to plot accuracy curve
 seen_positives = 0
 
-step = 1 / (n_samples)
-accuracy_curve_x = np.arange(step, 1 + step, step)
+accuracy_curve_x = np.linspace(0, 1, n_samples)
 accuracy_curve_y = []
 for i, (_, label) in enumerate(sorted_train_probs):
   seen_positives += label
@@ -165,6 +168,25 @@ for i, (_, label) in enumerate(sorted_train_probs):
 
 fig, ax = plt.subplots()
 ax.plot([0, 1], [0, 1], color='r', linestyle='--')
-ax.plot(accuracy_curve_x, accuracy_curve_y, color='r')
+ax.plot(accuracy_curve_x, accuracy_curve_y, color='b')
 
 plt.show()
+
+# Plot feature vs probability graph
+feature = 'Age'
+feature_range = np.arange(1, 100)
+
+coef_dict = dict(zip(predictor_columns, clf.best_estimator_.coef_[0]))
+
+graph_df = pd.DataFrame(columns=predictor_columns)
+graph_df[feature] = feature_range
+graph_df = graph_df.fillna(0)
+
+graph_x = graph_df[feature]
+graph_y = clf.predict_proba(graph_df)[:, 1] # Probability of positive (exit)
+
+fig, ax = plt.subplots()
+ax.plot(graph_x, graph_y)
+plt.show()
+
+
