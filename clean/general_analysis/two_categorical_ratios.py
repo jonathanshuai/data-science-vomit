@@ -46,4 +46,4 @@ def ratio_style(ratio_series):
                 
     return styles
 
-ratio_df.style.apply(ratio_style)
+compare_ratio_series.style.apply(ratio_style)
